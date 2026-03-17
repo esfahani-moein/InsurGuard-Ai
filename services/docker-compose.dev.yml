@@ -1,0 +1,70 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: ./frontend-services
+      dockerfile: Dockerfile.dev
+    image: insurguard-frontend-dev:latest
+    container_name: insurguard-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_TELEMETRY_DISABLED=1
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend-services/src:/app/src
+      - ./frontend-services/public:/app/public
+      - ./frontend-services/next.config.js:/app/next.config.js
+      - ./frontend-services/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend-services/postcss.config.js:/app/postcss.config.js
+      - ./frontend-services/tsconfig.json:/app/tsconfig.json
+      # Preserve node_modules inside the container (don't mount over them)
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    networks:
+      - insurguard-net
+
+  backend:
+    build:
+      context: ./backend-services
+      dockerfile: Dockerfile.dev
+    image: insurguard-backend-dev:latest
+    container_name: insurguard-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend-services/.env
+    environment:
+      - APP_ENV=development
+      - CHROMA_PERSIST_DIR=/data/chroma
+      - UPLOAD_DIR=/tmp/insurguard_uploads
+    volumes:
+      - ./backend-services/app:/app/app
+      - backend_chroma:/data/chroma
+      - backend_uploads:/tmp/insurguard_uploads
+    networks:
+      - insurguard-net
+    depends_on: []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  frontend_node_modules:
+  frontend_next:
+  backend_chroma:
+  backend_uploads:
+
+networks:
+  insurguard-net:
+    driver: bridge
