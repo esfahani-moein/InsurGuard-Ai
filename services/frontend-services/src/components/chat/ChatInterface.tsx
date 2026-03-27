@@ -7,7 +7,7 @@ import { useAppStore, type Attachment, type Message } from '@/lib/store'
 import { generateId } from '@/lib/utils'
 import { chatApi } from '@/lib/api'
 import { ChatMessage } from './ChatMessage'
-import { ChatInput } from './ChatInput'
+import { ChatInput, type PendingChatAttachment } from './ChatInput'
 
 const SUGGESTED_PROMPTS = [
   'Analyze the coverage gaps in this policy document',
@@ -44,18 +44,64 @@ export function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, isStreaming])
 
-  const handleSend = async (content: string, attachments: Attachment[]) => {
+  const serializeAttachment = async (attachment: PendingChatAttachment) => {
+    if (attachment.type.startsWith('text/')) {
+      return {
+        name: attachment.name,
+        type: attachment.type,
+        content: await attachment.file.text(),
+      }
+    }
+
+    return new Promise<{ name: string; type: string; content: string }>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== 'string') {
+          reject(new Error(`Could not read attachment: ${attachment.name}`))
+          return
+        }
+
+        const [, base64 = ''] = result.split(',', 2)
+        if (!base64) {
+          reject(new Error(`Attachment payload was empty: ${attachment.name}`))
+          return
+        }
+
+        resolve({
+          name: attachment.name,
+          type: attachment.type,
+          content: base64,
+        })
+      }
+      reader.onerror = () => reject(reader.error ?? new Error(`Failed to read attachment: ${attachment.name}`))
+      reader.readAsDataURL(attachment.file)
+    })
+  }
+
+  const handleSend = async (content: string, attachments: PendingChatAttachment[]) => {
     let convId = activeConversationId
     if (!convId) {
       convId = createConversation()
       setActiveConversation(convId)
     }
 
+    const requestMessage = content.trim() || 'Please analyze the attached file(s).'
+
+    const displayAttachments: Attachment[] = attachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      type: attachment.type,
+      size: attachment.size,
+      url: attachment.url,
+      thumbnailUrl: attachment.thumbnailUrl,
+    }))
+
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
-      content,
-      attachments: attachments.length > 0 ? attachments : undefined,
+      content: requestMessage,
+      attachments: displayAttachments.length > 0 ? displayAttachments : undefined,
       createdAt: new Date(),
     }
 
@@ -63,9 +109,9 @@ export function ChatInterface() {
 
     // Update title from first message
     const conv = conversations.find((c) => c.id === convId)
-    if (conv && conv.messages.length === 0 && content.trim()) {
+    if (conv && conv.messages.length === 0 && requestMessage.trim()) {
       const title =
-        content.length > 50 ? content.slice(0, 50) + '…' : content
+        requestMessage.length > 50 ? requestMessage.slice(0, 50) + '…' : requestMessage
       updateConversationTitle(convId, title)
     }
 
@@ -82,15 +128,11 @@ export function ChatInterface() {
     setIsStreaming(true)
 
     try {
-      const apiAttachments = attachments.map((a) => ({
-        name: a.name,
-        type: a.type,
-        content: a.url,
-      }))
+      const apiAttachments = await Promise.all(attachments.map(serializeAttachment))
       streamBufferRef.current = ''
       await chatApi.streamMessage(
         {
-          message: content,
+          message: requestMessage,
           conversation_id: convId,
           attachments: apiAttachments.length > 0 ? apiAttachments : undefined,
           model: selectedModel,
@@ -103,6 +145,13 @@ export function ChatInterface() {
           })
         }
       )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send chat request.'
+      updateMessage(convId, assistantMsgId, {
+        content: `Attachment request failed: ${message}`,
+        isStreaming: false,
+      })
+      throw error
     } finally {
       setIsStreaming(false)
       updateMessage(convId, assistantMsgId, { isStreaming: false })
@@ -136,7 +185,7 @@ export function ChatInterface() {
   )
 }
 
-function EmptyState({ onSuggest }: { onSuggest: (content: string, attachments: Attachment[]) => void }) {
+function EmptyState({ onSuggest }: { onSuggest: (content: string, attachments: PendingChatAttachment[]) => void | Promise<void> }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

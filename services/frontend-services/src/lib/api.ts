@@ -76,6 +76,10 @@ export const chatApi = {
       body: JSON.stringify(payload),
     })
 
+    if (!response.ok) {
+      throw new Error(`Chat stream request failed with status ${response.status}`)
+    }
+
     if (!response.body) throw new Error('No response body')
 
     const reader = response.body.getReader()
@@ -89,11 +93,21 @@ export const chatApi = {
       for (const line of lines) {
         const data = line.replace('data: ', '')
         if (data === '[DONE]') return
+        let parsed: { content?: string; error?: string } | null = null
         try {
-          const parsed = JSON.parse(data)
-          if (parsed.content) onChunk(parsed.content)
+          parsed = JSON.parse(data)
         } catch {
           onChunk(data)
+          continue
+        }
+        if (!parsed) {
+          continue
+        }
+        if (parsed.error) {
+          throw new Error(parsed.error)
+        }
+        if (parsed.content) {
+          onChunk(parsed.content)
         }
       }
     }

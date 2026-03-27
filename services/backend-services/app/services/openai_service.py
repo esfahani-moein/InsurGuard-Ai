@@ -60,16 +60,16 @@ def _build_contents(
 
     if attachments:
         for att in attachments:
-            if att.type.startswith("image/"):
+            if att.type.startswith("image/") or att.type == "application/pdf":
                 try:
-                    raw = base64.b64decode(att.content)
+                    raw = base64.b64decode(att.content, validate=True)
                     parts.append(
                         genai_types.Part.from_bytes(data=raw, mime_type=att.type)
                     )
                 except Exception:
                     parts.append(
                         genai_types.Part.from_text(
-                            text=f"\n[Image attachment: {att.name} — could not decode]"
+                            text=f"\n[Attachment: {att.name} — binary payload could not decode]"
                         )
                     )
             else:

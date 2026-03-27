@@ -4,10 +4,16 @@ from functools import lru_cache
 # All selectable Gemini models — default is flash (fast + cheap)
 AVAILABLE_MODELS: list[dict] = [
     {
+        "id": "gemini-3-flash-preview",
+        "name": "Gemini 3 Flash Preview",
+        "description": "Latest Gemini 3 Flash model for multimodal chat and OCR-style tasks (default)",
+        "is_default": True,
+    },
+    {
         "id": "gemini-2.5-flash",
         "name": "Gemini 2.5 Flash",
-        "description": "Fast, capable, and recommended for most tasks (default)",
-        "is_default": True,
+        "description": "Fast, capable, and recommended fallback model",
+        "is_default": False,
     },
     {
         "id": "gemini-2.5-flash-lite",
@@ -35,7 +41,7 @@ AVAILABLE_MODELS: list[dict] = [
     },
 ]
 
-DEFAULT_MODEL_ID = "gemini-2.5-flash"
+DEFAULT_MODEL_ID = "gemini-3-flash-preview"
 
 
 class Settings(BaseSettings):

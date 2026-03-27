@@ -32,7 +32,7 @@ export function SettingsPage() {
         .then((res) => {
           setGeminiModels(res.models)
           if (!res.models.some((m) => m.id === selectedModel)) {
-            setSelectedModel(res.default || res.models[0]?.id || 'gemini-2.5-flash')
+            setSelectedModel(res.default || res.models[0]?.id || 'gemini-3-flash-preview')
           }
         })
         .catch(() => setGeminiModels([]))

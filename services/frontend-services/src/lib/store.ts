@@ -67,7 +67,7 @@ export const useAppStore = create<AppState>()(
       activeConversationId: null,
       conversations: [],
       activePage: 'dashboard',
-      selectedModel: 'gemini-2.5-flash',
+      selectedModel: 'gemini-3-flash-preview',
 
       setTheme: (theme) => {
         set({ theme })

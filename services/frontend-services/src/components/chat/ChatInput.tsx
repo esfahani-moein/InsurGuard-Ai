@@ -14,8 +14,12 @@ import {
 import { cn, formatFileSize, generateId } from '@/lib/utils'
 import type { Attachment } from '@/lib/store'
 
+export interface PendingChatAttachment extends Attachment {
+  file: File
+}
+
 interface ChatInputProps {
-  onSend: (content: string, attachments: Attachment[]) => void
+  onSend: (content: string, attachments: PendingChatAttachment[]) => void | Promise<void>
   disabled?: boolean
   placeholder?: string
 }
@@ -68,31 +72,39 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
     })
   }
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = value.trim()
     if (!trimmed && pendingFiles.length === 0) return
 
-    const attachments: Attachment[] = pendingFiles.map((pf) => ({
+    const attachments: PendingChatAttachment[] = pendingFiles.map((pf) => ({
       id: pf.id,
       name: pf.file.name,
       type: pf.file.type,
       size: pf.file.size,
       url: pf.preview || '',
       thumbnailUrl: pf.preview,
+      file: pf.file,
     }))
 
-    onSend(trimmed, attachments)
-    setValue('')
-    setPendingFiles([])
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
+    try {
+      await onSend(trimmed, attachments)
+      pendingFiles.forEach((pf) => {
+        if (pf.preview) URL.revokeObjectURL(pf.preview)
+      })
+      setValue('')
+      setPendingFiles([])
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+      }
+    } catch (error) {
+      console.error('Failed to send message with attachments', error)
     }
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      void handleSend()
     }
   }
 
@@ -228,7 +240,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
 
           {/* Send / Stop */}
           <motion.button
-            onClick={handleSend}
+            onClick={() => void handleSend()}
             disabled={!canSend}
             whileTap={{ scale: 0.92 }}
             className={cn(
