@@ -28,6 +28,7 @@ export function ChatInterface() {
     createConversation,
     setActiveConversation,
     selectedModel,
+    addNotification,
   } = useAppStore()
 
   const [isStreaming, setIsStreaming] = useState(false)
@@ -107,6 +108,16 @@ export function ChatInterface() {
 
     addMessage(convId, userMsg)
 
+    // Show sending notification
+    addNotification({
+      type: 'info',
+      title: 'Sending Message',
+      message: attachments.length > 0 
+        ? `Sending message with ${attachments.length} attachment${attachments.length > 1 ? 's' : ''}...`
+        : 'Sending your message...',
+      duration: 3000,
+    })
+
     // Update title from first message
     const conv = conversations.find((c) => c.id === convId)
     if (conv && conv.messages.length === 0 && requestMessage.trim()) {
@@ -145,11 +156,25 @@ export function ChatInterface() {
           })
         }
       )
+      // Show success notification
+      addNotification({
+        type: 'success',
+        title: 'Response Received',
+        message: 'The AI has completed your request.',
+        duration: 4000,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to send chat request.'
       updateMessage(convId, assistantMsgId, {
-        content: `Attachment request failed: ${message}`,
+        content: `Request failed: ${message}`,
         isStreaming: false,
+      })
+      // Show error notification
+      addNotification({
+        type: 'error',
+        title: 'Request Failed',
+        message: message,
+        duration: 5000,
       })
       throw error
     } finally {

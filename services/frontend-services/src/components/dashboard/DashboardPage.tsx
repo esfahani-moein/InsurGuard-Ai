@@ -91,7 +91,11 @@ const stats = [
 ]
 
 export function DashboardPage() {
-  const { setActivePage, createConversation, setActiveConversation } = useAppStore()
+  const { setActivePage, createConversation, setActiveConversation, users, currentUserId } = useAppStore()
+  
+  // Get current user
+  const currentUser = users.find((u) => u.id === currentUserId)
+  const firstName = currentUser?.name?.split(' ')[0] || 'there'
 
   const handleStartChat = () => {
     const id = createConversation()
@@ -118,7 +122,7 @@ export function DashboardPage() {
 
           <div className="relative flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-brand-200 text-sm font-medium mb-1">Welcome back, John</p>
+              <p className="text-brand-200 text-sm font-medium mb-1">Welcome back, {firstName}</p>
               <h2 className="font-display font-bold text-2xl mb-2">
                 InsurGuard AI Platform
               </h2>

@@ -2,28 +2,44 @@
 
 import { useState, useEffect, type ElementType } from 'react'
 import { motion } from 'framer-motion'
-import { Sun, Moon, Bell, Shield, Database, Key, User, Save, Cpu } from 'lucide-react'
+import { Sun, Moon, Bell, Shield, Database, Key, User, Save, Cpu, Users, Plus, Trash2, Edit2, X, Check } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { modelsApi, type GeminiModel } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-type Section = 'appearance' | 'account' | 'notifications' | 'api' | 'privacy'
+type Section = 'appearance' | 'account' | 'notifications' | 'api' | 'privacy' | 'users'
 
 const sections: { id: Section; label: string; icon: ElementType }[] = [
   { id: 'appearance', label: 'Appearance', icon: Sun },
   { id: 'account', label: 'Account', icon: User },
+  { id: 'users', label: 'Users', icon: Users },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'api', label: 'API Keys', icon: Key },
   { id: 'privacy', label: 'Privacy & Data', icon: Shield },
 ]
 
 export function SettingsPage() {
-  const { theme, setTheme, selectedModel, setSelectedModel } = useAppStore()
+  const { theme, setTheme, selectedModel, setSelectedModel, users, currentUserId, addUser, updateUser, deleteUser, setCurrentUser, addNotification } = useAppStore()
   const [activeSection, setActiveSection] = useState<Section>('appearance')
   const [apiKey, setApiKey] = useState('')
   const [saved, setSaved] = useState(false)
   const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
+  
+  // User management state
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [newUserForm, setNewUserForm] = useState({
+    name: '',
+    email: '',
+    role: 'Analyst' as const,
+  })
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    role: 'Analyst' as const,
+  })
+
+  const getCurrentUser = () => users.find((u) => u.id === currentUserId)
 
   useEffect(() => {
     if (activeSection === 'api') {
@@ -170,6 +186,191 @@ export function SettingsPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </>
+              )}
+
+              {activeSection === 'users' && (
+                <>
+                  <div>
+                    <h2 className="font-display font-semibold text-lg text-[var(--text-primary)] mb-1">User Management</h2>
+                    <p className="text-sm text-[var(--text-muted)]">Manage user accounts and permissions.</p>
+                  </div>
+
+                  {/* Add New User Form */}
+                  <div className="bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl p-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)] mb-3">Add New User</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Full Name"
+                        value={newUserForm.name}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                        className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500 transition-colors"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={newUserForm.email}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                        className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500 transition-colors"
+                      />
+                      <select
+                        value={newUserForm.role}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as 'Administrator' | 'Analyst' | 'Viewer' })}
+                        className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500 transition-colors"
+                      >
+                        <option value="Administrator">Administrator</option>
+                        <option value="Analyst">Analyst</option>
+                        <option value="Viewer">Viewer</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (newUserForm.name && newUserForm.email) {
+                          addUser({
+                            name: newUserForm.name,
+                            email: newUserForm.email,
+                            role: newUserForm.role,
+                            avatar: newUserForm.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2),
+                          })
+                          addNotification({
+                            type: 'success',
+                            title: 'User Created',
+                            message: `${newUserForm.name} has been added as ${newUserForm.role}`,
+                            duration: 3000,
+                          })
+                          setNewUserForm({ name: '', email: '', role: 'Analyst' })
+                        }
+                      }}
+                      disabled={!newUserForm.name || !newUserForm.email}
+                      className="mt-3 flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add User
+                    </button>
+                  </div>
+
+                  {/* User List */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">All Users ({users.length})</p>
+                    {users.map((user) => (
+                      <div
+                        key={user.id}
+                        className={cn(
+                          'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                          currentUserId === user.id
+                            ? 'border-brand-500/50 bg-brand-500/5'
+                            : 'border-[var(--border)] bg-[var(--surface-overlay)]'
+                        )}
+                      >
+                        {editingUserId === user.id ? (
+                          <>
+                            <div className="flex-1 grid grid-cols-3 gap-2">
+                              <input
+                                type="text"
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500"
+                              />
+                              <input
+                                type="email"
+                                value={editForm.email}
+                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500"
+                              />
+                              <select
+                                value={editForm.role}
+                                onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'Administrator' | 'Analyst' | 'Viewer' })}
+                                className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-brand-500"
+                              >
+                                <option value="Administrator">Administrator</option>
+                                <option value="Analyst">Analyst</option>
+                                <option value="Viewer">Viewer</option>
+                              </select>
+                            </div>
+                            <button
+                              onClick={() => {
+                                updateUser(user.id, {
+                                  name: editForm.name,
+                                  email: editForm.email,
+                                  role: editForm.role,
+                                })
+                                setEditingUserId(null)
+                                addNotification({
+                                  type: 'success',
+                                  title: 'User Updated',
+                                  message: `${editForm.name}'s information has been updated`,
+                                  duration: 3000,
+                                })
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditingUserId(null)}
+                              className="p-1.5 rounded-lg bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
+                              <span className="text-white text-sm font-bold">
+                                {user.avatar || user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                                {user.name}
+                                {currentUserId === user.id && (
+                                  <span className="ml-2 text-[10px] font-medium text-brand-400 bg-brand-500/20 px-1.5 py-0.5 rounded-full">
+                                    You
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)] truncate">{user.email}</p>
+                            </div>
+                            <span className="text-xs text-[var(--text-secondary)] bg-[var(--surface)] px-2 py-1 rounded-lg border border-[var(--border)]">
+                              {user.role}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditingUserId(user.id)
+                                setEditForm({
+                                  name: user.name,
+                                  email: user.email,
+                                  role: user.role,
+                                })
+                              }}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)] transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {users.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete ${user.name}?`)) {
+                                    deleteUser(user.id)
+                                    addNotification({
+                                      type: 'warning',
+                                      title: 'User Deleted',
+                                      message: `${user.name} has been removed`,
+                                      duration: 3000,
+                                    })
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </>
               )}

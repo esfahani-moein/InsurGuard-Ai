@@ -8,6 +8,7 @@ import { DashboardPage } from '@/components/dashboard/DashboardPage'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import { AnalyticsPage } from '@/components/analytics/AnalyticsPage'
+import { NotificationContainer } from '@/components/notifications/NotificationToast'
 import { AnimatePresence, motion } from 'framer-motion'
 
 export default function Home() {
@@ -15,7 +16,11 @@ export default function Home() {
   const showChatSidebar = activePage === 'chat'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--surface)]">
+    <>
+      {/* Global notification container */}
+      <NotificationContainer />
+      
+      <div className="flex h-screen overflow-hidden bg-[var(--surface)]">
       {/* Left nav sidebar */}
       <Sidebar />
 
@@ -56,5 +61,6 @@ export default function Home() {
         </main>
       </div>
     </div>
+    </>
   )
 }
