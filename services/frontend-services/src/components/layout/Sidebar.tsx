@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
+import { NotificationHistoryPanel } from '@/components/notifications/NotificationHistoryPanel'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,7 +25,10 @@ const navItems = [
 ] as const
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar, activePage, setActivePage } = useAppStore()
+  const { sidebarCollapsed, toggleSidebar, activePage, setActivePage, getUnreadCount } = useAppStore()
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false)
+  const notifButtonRef = useRef<HTMLButtonElement>(null)
+  const unreadCount = getUnreadCount()
 
   return (
     <motion.aside
@@ -106,27 +111,49 @@ export function Sidebar() {
 
       {/* Bottom section */}
       <div className="px-3 py-4 border-t border-[var(--border)] space-y-1 flex-shrink-0">
-        <button className="relative flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)] transition-all duration-200 group">
-          <Bell className="w-[18px] h-[18px] flex-shrink-0" />
-          <AnimatePresence>
-            {!sidebarCollapsed && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="whitespace-nowrap"
-              >
-                Notifications
-              </motion.span>
+        {/* Notification wrapper - use div to avoid nested buttons */}
+        <div className="relative">
+          <button
+            ref={notifButtonRef}
+            onClick={() => setNotifPanelOpen(!notifPanelOpen)}
+            className="relative flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)] transition-all duration-200 group"
+          >
+            <Bell className="w-[18px] h-[18px] flex-shrink-0" />
+            <AnimatePresence>
+              {!sidebarCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="whitespace-nowrap"
+                >
+                  Notifications
+                </motion.span>
+              )}
+            </AnimatePresence>
+            {/* Notification badge */}
+            {unreadCount > 0 && (
+              <span className={cn(
+                "absolute flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-brand-500 rounded-full",
+                sidebarCollapsed ? "top-1 left-5" : "top-2 left-6"
+              )}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             )}
-          </AnimatePresence>
-          <span className="absolute top-2 left-6 w-2 h-2 bg-brand-500 rounded-full" />
-          {sidebarCollapsed && (
-            <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[var(--surface-overlay)] text-[var(--text-primary)] text-xs font-medium rounded-lg border border-[var(--border)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg">
-              Notifications
-            </div>
-          )}
-        </button>
+            {sidebarCollapsed && (
+              <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[var(--surface-overlay)] text-[var(--text-primary)] text-xs font-medium rounded-lg border border-[var(--border)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg">
+                Notifications{unreadCount > 0 ? ` (${unreadCount})` : ''}
+              </div>
+            )}
+          </button>
+          {/* Notification Panel - outside of button to avoid nested buttons */}
+          <NotificationHistoryPanel
+            isOpen={notifPanelOpen}
+            onClose={() => setNotifPanelOpen(false)}
+            triggerRef={notifButtonRef}
+            placement="bottom-left"
+          />
+        </div>
 
         <button className="relative flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-overlay)] hover:text-[var(--text-primary)] transition-all duration-200 group">
           <FileText className="w-[18px] h-[18px] flex-shrink-0" />

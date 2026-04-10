@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Sun, Moon, Search, Bell, ChevronDown, User, Settings, LogOut, Plus } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { cn, truncate } from '@/lib/utils'
+import { NotificationHistoryPanel } from '@/components/notifications/NotificationHistoryPanel'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview & statistics' },
@@ -14,10 +15,13 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 }
 
 export function Header() {
-  const { theme, toggleTheme, activePage, users, currentUserId, setCurrentUser, setActivePage, addNotification } = useAppStore()
+  const { theme, toggleTheme, activePage, users, currentUserId, setCurrentUser, setActivePage, addNotification, getUnreadCount } = useAppStore()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const notifButtonRef = useRef<HTMLButtonElement>(null)
   const pageInfo = pageTitles[activePage] || pageTitles.dashboard
+  const unreadCount = getUnreadCount()
 
   // Get current user
   const currentUser = users.find((u) => u.id === currentUserId) || users[0]
@@ -64,7 +68,10 @@ export function Header() {
   }
 
   return (
-    <header className="flex items-center gap-4 px-6 h-16 border-b border-[var(--border)] bg-[var(--surface)] flex-shrink-0 z-10">
+    <header
+      className="flex items-center gap-4 px-6 h-16 border-b border-[var(--border)] bg-[var(--surface)] flex-shrink-0 z-10"
+      suppressHydrationWarning
+    >
       {/* Page title */}
       <div className="flex-1 min-w-0">
         <motion.div
@@ -95,13 +102,29 @@ export function Header() {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Notifications */}
-        <button className="relative flex items-center justify-center w-9 h-9 rounded-xl hover:bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200">
-          <Bell className="w-4.5 h-4.5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-[var(--surface)]" />
-        </button>
+        {/* Notifications - 1st position (left most) */}
+        <div className="relative">
+          <button
+            ref={notifButtonRef}
+            onClick={() => setNotifPanelOpen(!notifPanelOpen)}
+            className="relative flex items-center justify-center w-9 h-9 rounded-xl hover:bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
+          >
+            <Bell className="w-4.5 h-4.5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-brand-500 rounded-full ring-2 ring-[var(--surface)]">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <NotificationHistoryPanel
+            isOpen={notifPanelOpen}
+            onClose={() => setNotifPanelOpen(false)}
+            triggerRef={notifButtonRef}
+            placement="bottom-right"
+          />
+        </div>
 
-        {/* Theme toggle */}
+        {/* Theme toggle - 2nd position (middle) */}
         <button
           onClick={toggleTheme}
           className={cn(
@@ -120,7 +143,7 @@ export function Header() {
           </motion.div>
         </button>
 
-        {/* User avatar with dropdown */}
+        {/* User avatar with dropdown - 3rd position (right most) */}
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}

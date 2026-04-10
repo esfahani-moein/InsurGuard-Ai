@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { useAppStore, type Notification, type NotificationType } from '@/lib/store'
@@ -45,14 +45,7 @@ function Toast({ notification, onClose }: ToastProps) {
   const Icon = icons[notification.type]
   const color = colors[notification.type]
 
-  useEffect(() => {
-    if (notification.duration && notification.duration > 0) {
-      const timer = setTimeout(() => {
-        onClose(notification.id)
-      }, notification.duration)
-      return () => clearTimeout(timer)
-    }
-  }, [notification.id, notification.duration, onClose])
+  // Notifications persist until manually closed - no auto-dismiss
 
   return (
     <motion.div
@@ -92,30 +85,32 @@ function Toast({ notification, onClose }: ToastProps) {
         <X className="w-4 h-4" />
       </button>
 
-      {/* Progress bar for auto-dismiss */}
-      {notification.duration && notification.duration > 0 && (
-        <motion.div
-          initial={{ scaleX: 1 }}
-          animate={{ scaleX: 0 }}
-          transition={{ duration: notification.duration / 1000, ease: 'linear' }}
-          className={cn(
-            'absolute bottom-0 left-0 right-0 h-0.5 rounded-full origin-left',
-            color.icon.replace('text-', 'bg-')
-          )}
-        />
-      )}
     </motion.div>
   )
 }
 
 export function NotificationContainer() {
-  const { notifications, removeNotification } = useAppStore()
+  const { getUserNotifications, removeNotification } = useAppStore()
+  const [mounted, setMounted] = useState(false)
+  const notifications = getUserNotifications()
+
+  // Only show notifications with duration as toast popups
+  const toastNotifications = notifications.filter((n: Notification) => n.duration && n.duration > 0)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Prevent hydration mismatch by only rendering on client
+  if (!mounted) {
+    return null
+  }
 
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" suppressHydrationWarning>
       <AnimatePresence mode="popLayout">
-        {notifications.map((notification) => (
-          <div key={notification.id} className="pointer-events-auto">
+        {toastNotifications.slice(0, 3).map((notification: Notification) => (
+          <div key={notification.id} className="pointer-events-auto" suppressHydrationWarning>
             <Toast
               notification={notification}
               onClose={removeNotification}

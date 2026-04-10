@@ -69,8 +69,8 @@ interface AppState {
   users: User[]
   currentUserId: string | null
 
-  // Notifications
-  notifications: Notification[]
+  // Notifications (per-user, keyed by userId)
+  userNotifications: Record<string, Notification[]>
 
   // Theme & UI
   setTheme: (theme: Theme) => void
@@ -97,11 +97,13 @@ interface AppState {
   setCurrentUser: (id: string | null) => void
   getCurrentUser: () => User | null
 
-  // Notification Actions
+  // Notification Actions (per-user)
   addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => string
   removeNotification: (id: string) => void
   markNotificationRead: (id: string) => void
   clearAllNotifications: () => void
+  getUserNotifications: (userId?: string) => Notification[]
+  getUnreadCount: (userId?: string) => number
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 11)
@@ -134,8 +136,8 @@ export const useAppStore = create<AppState>()(
         users: [defaultUser],
         currentUserId: defaultUser.id,
 
-        // Notifications
-        notifications: [],
+        // Notifications per user
+        userNotifications: {},
 
       setTheme: (theme) => {
         set({ theme })
@@ -267,7 +269,7 @@ export const useAppStore = create<AppState>()(
         return users.find((u) => u.id === currentUserId) ?? null
       },
 
-      // ── Notifications ────────────────────────────────────────────────────────
+      // ── Notifications (Per-User) ─────────────────────────────────────────────
 
       addNotification: (notificationData) => {
         const id = generateId()
@@ -277,34 +279,64 @@ export const useAppStore = create<AppState>()(
           createdAt: new Date(),
           read: false,
         }
+        const currentUserId = get().currentUserId
+        if (!currentUserId) return id
+
         set((s) => ({
-          notifications: [notification, ...s.notifications].slice(0, 50), // Keep last 50
+          userNotifications: {
+            ...s.userNotifications,
+            [currentUserId]: [notification, ...(s.userNotifications[currentUserId] || [])].slice(0, 100), // Keep last 100 per user
+          },
         }))
-        // Auto-remove after duration
-        if (notificationData.duration && notificationData.duration > 0) {
-          setTimeout(() => {
-            get().removeNotification(id)
-          }, notificationData.duration)
-        }
         return id
       },
 
       removeNotification: (id) => {
+        const currentUserId = get().currentUserId
+        if (!currentUserId) return
         set((s) => ({
-          notifications: s.notifications.filter((n) => n.id !== id),
+          userNotifications: {
+            ...s.userNotifications,
+            [currentUserId]: (s.userNotifications[currentUserId] || []).filter((n) => n.id !== id),
+          },
         }))
       },
 
-      markNotificationRead: (id) => {
-        set((s) => ({
-          notifications: s.notifications.map((n) =>
-            n.id === id ? { ...n, read: true } : n
-          ),
+      markNotificationRead: (id: string) => {
+        const currentUserId = get().currentUserId
+        if (!currentUserId) return
+        set((state: { userNotifications: Record<string, Notification[]> }) => ({
+          userNotifications: {
+            ...state.userNotifications,
+            [currentUserId]: (state.userNotifications[currentUserId] || []).map((n: Notification) =>
+              n.id === id ? { ...n, read: true } : n
+            ),
+          },
         }))
       },
 
       clearAllNotifications: () => {
-        set({ notifications: [] })
+        const currentUserId = get().currentUserId
+        if (!currentUserId) return
+        set((s) => ({
+          userNotifications: {
+            ...s.userNotifications,
+            [currentUserId]: [],
+          },
+        }))
+      },
+
+      getUserNotifications: (userId?: string) => {
+        const targetUserId = userId || get().currentUserId
+        if (!targetUserId) return []
+        return get().userNotifications[targetUserId] || []
+      },
+
+      getUnreadCount: (userId?: string) => {
+        const targetUserId = userId || get().currentUserId
+        if (!targetUserId) return 0
+        const notifications = get().userNotifications[targetUserId] || []
+        return notifications.filter((n) => !n.read).length
       },
     }},
     {
@@ -317,7 +349,7 @@ export const useAppStore = create<AppState>()(
         selectedModel: s.selectedModel,
         users: s.users,
         currentUserId: s.currentUserId,
-        // Notifications are not persisted - they're transient
+        userNotifications: s.userNotifications, // Persist notifications per user
       }),
     }
   )
